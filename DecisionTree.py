@@ -1,12 +1,14 @@
-'''
+"""
 Authors: Ashwani Kashyap, Anshul Pardhi
-'''
+"""
 
 import math
+
 
 def unique_vals(rows, col):
     """Find the unique values for a column in a dataset."""
     return set([row[col] for row in rows])
+
 
 #######
 # Demo:
@@ -26,12 +28,11 @@ def class_counts(rows):
         counts[label] += 1
     return counts
 
+
 #######
 # Demo:
 # class_counts(training_data)
 #######
-
-
 
 
 def max_label(dict):
@@ -46,11 +47,10 @@ def max_label(dict):
     return label
 
 
-
-
 def is_numeric(value):
     """Test if a value is numeric."""
     return isinstance(value, int) or isinstance(value, float)
+
 
 #######
 # Demo:
@@ -78,7 +78,7 @@ class Question:
         # feature value in this question.
         val = example[self.column]
         if is_numeric(val):
-            return val >= self.value
+            return val <= self.value
         else:
             return val == self.value
 
@@ -87,12 +87,11 @@ class Question:
         # the question in a readable format.
         condition = "=="
         if is_numeric(self.value):
-            condition = ">="
-        return "Is %s %s %s?" % (
-            self.header[self.column], condition, str(self.value))
+            condition = "<="
+        return "Is %s %s %s?" % (self.header[self.column], condition, str(self.value))
 
 
-def partition(rows, question):
+def partition(rows, question: Question):
     """Partitions a dataset.
 
     For each row in the dataset, check if it matches the question. If
@@ -121,9 +120,9 @@ def gini(rows):
         impurity -= prob_of_lbl**2
     return impurity
 
+
 ## TODO: Step 3
 def entropy(rows):
-
     # compute the entropy.
     entries = class_counts(rows)
     avg_entropy = 0
@@ -131,7 +130,7 @@ def entropy(rows):
     for label in entries:
         prob = entries[label] / size
         avg_entropy = avg_entropy + (prob * math.log(prob, 2))
-    return -1*avg_entropy
+    return -1 * avg_entropy
 
 
 def info_gain(left, right, current_uncertainty):
@@ -145,6 +144,7 @@ def info_gain(left, right, current_uncertainty):
     ## TODO: Step 3, Use Entropy in place of Gini
     return current_uncertainty - p * entropy(left) - (1 - p) * entropy(right)
 
+
 def find_best_split(rows, header):
     """Find the best question to ask by iterating over every feature / value
     and calculating the information gain."""
@@ -154,23 +154,12 @@ def find_best_split(rows, header):
     n_features = len(rows[0]) - 1  # number of columns
 
     for col in range(n_features):  # for each feature
-
         values = set([row[col] for row in rows])  # unique values in the column
 
         for val in values:  # for each value
-
             question = Question(col, val, header)
 
-            # try splitting the dataset
-            true_rows, false_rows = partition(rows, question)
-
-            # Skip this split if it doesn't divide the
-            # dataset.
-            if len(true_rows) == 0 or len(false_rows) == 0:
-                continue
-
-            # Calculate the information gain from this split
-            gain = info_gain(true_rows, false_rows, current_uncertainty)
+            gain = __calculate_gain(question, rows, current_uncertainty)
 
             # You actually can use '>' instead of '>=' here
             # but I wanted the tree to look a certain way for our
@@ -179,6 +168,56 @@ def find_best_split(rows, header):
                 best_gain, best_question = gain, question
 
     return best_gain, best_question
+
+
+def find_best_split_var(rows, header, config: dict):
+    """
+    Find the best question to ask by iterating over every feature / value
+    and calculating the information gain.
+    This function considers that some variation may happen in the value and
+    train the tree with variation.
+    """
+    assert config[
+        "hasWeightVar"
+    ], 'to use this function for training, "hasWeightVar" in config must be true!'
+    best_gain = 0  # keep track of the best information gain
+    best_question = None  # keep train of the feature / value that produced it
+    current_uncertainty = entropy(rows)
+    n_features = len(rows[0]) - 1  # number of columns
+
+    for col in range(n_features):  # for each feature
+        values = set([row[col] for row in rows])  # unique values in the column
+
+        sortedValues = sorted(values)
+        # midPointValues = [(sortedValues[i] + sortedValues[i + 1])/2 for i in range(len(sortedValues) - 1)]
+
+        for val in sortedValues:  # for each value
+            question = Question(col, val, header)
+
+            gain = __calculate_gain(question, rows, current_uncertainty)
+
+            # You actually can use '>' instead of '>=' here
+            # but I wanted the tree to look a certain way for our
+            # toy dataset.
+            if gain >= best_gain:
+                best_gain, best_question = gain, question
+
+    return best_gain, best_question
+
+
+def __calculate_gain(question: Question, rows, currentUncertainty) -> float:
+    # try splitting the dataset
+    true_rows, false_rows = partition(rows, question)
+
+    # Skip this split if it doesn't divide the
+    # dataset.
+    if len(true_rows) == 0 or len(false_rows) == 0:
+        return 0
+
+    # Calculate the information gain from this split
+    gain = info_gain(true_rows, false_rows, currentUncertainty)
+    return gain
+
 
 ## TODO: Step 2
 class Leaf:
@@ -194,6 +233,7 @@ class Leaf:
         self.id = id
         self.depth = depth
 
+
 ## TODO: Step 1
 class Decision_Node:
     """A Decision Node asks a question.
@@ -201,13 +241,7 @@ class Decision_Node:
     This holds a reference to the question, and to the two child nodes.
     """
 
-    def __init__(self,
-                 question,
-                 true_branch,
-                 false_branch,
-                 depth,
-                 id,
-                 rows):
+    def __init__(self, question, true_branch, false_branch, depth, id, rows):
         self.question = question
         self.true_branch = true_branch
         self.false_branch = false_branch
@@ -217,7 +251,7 @@ class Decision_Node:
 
 
 ## TODO: Step 3
-def build_tree(rows, header, depth=0, id=0):
+def build_tree(rows, header, config: dict, depth=0, id=0):
     """Builds the tree.
 
     Rules of recursion: 1) Believe that it works. 2) Start by checking
@@ -229,7 +263,10 @@ def build_tree(rows, header, depth=0, id=0):
     # calculate the information gain,
     # and return the question that produces the highest gain.
 
-    gain, question = find_best_split(rows, header)
+    if config["hasWeightVar"]:
+        gain, question = find_best_split_var(rows, header, config)
+    else:
+        gain, question = find_best_split(rows, header)
 
     # Base case: no further info gain
     # Since we can ask no further questions,
@@ -243,16 +280,17 @@ def build_tree(rows, header, depth=0, id=0):
     true_rows, false_rows = partition(rows, question)
 
     # Recursively build the true branch.
-    true_branch = build_tree(true_rows, header, depth + 1, 2 * id + 2)
+    true_branch = build_tree(true_rows, header, config, depth + 1, 2 * id + 2)
 
     # Recursively build the false branch.
-    false_branch = build_tree(false_rows, header, depth + 1, 2 * id + 1)
+    false_branch = build_tree(false_rows, header, config, depth + 1, 2 * id + 1)
 
     # Return a Question node.
     # This records the best feature / value to ask at this point,
     # as well as the branches to follow
     # depending on on the answer.
     return Decision_Node(question, true_branch, false_branch, depth, id, rows)
+
 
 ## TODO: Step 8 - already done for you
 def prune_tree(node, prunedList):
@@ -279,6 +317,7 @@ def prune_tree(node, prunedList):
 
     return node
 
+
 ## TODO: Step 6
 def classify(row, node):
     """See the 'rules of recursion' above."""
@@ -295,24 +334,40 @@ def classify(row, node):
     else:
         return classify(row, node.false_branch)
 
+
 ## TODO: Step 4
 def print_tree(node, spacing=""):
     """World's most elegant tree printing function."""
 
     # Base case: we've reached a leaf
     if isinstance(node, Leaf):
-        print(spacing + "Leaf id: " + str(node.id) + " Predictions: " + str(node.predictions) + " Label Class: " + str(node.predicted_label))
+        print(
+            spacing
+            + "Leaf id: "
+            + str(node.id)
+            + " Predictions: "
+            + str(node.predictions)
+            + " Label Class: "
+            + str(node.predicted_label)
+        )
         return
 
     # Print the question at this node
-    print(spacing + str(node.question) + " id: " + str(node.id) + " depth: " + str(node.depth))
+    print(
+        spacing
+        + str(node.question)
+        + " id: "
+        + str(node.id)
+        + " depth: "
+        + str(node.depth)
+    )
 
     # Call this function recursively on the true branch
-    print(spacing + '--> True:')
+    print(spacing + "--> True:")
     print_tree(node.true_branch, spacing + "  ")
 
     # Call this function recursively on the false branch
-    print(spacing + '--> False:')
+    print(spacing + "--> False:")
     print_tree(node.false_branch, spacing + "  ")
 
 
@@ -324,9 +379,9 @@ def print_leaf(counts):
         probs[lbl] = str(int(counts[lbl] / total * 100)) + "%"
     return probs
 
-## TODO: Step 5
-def getLeafNodes(node, leafNodes =[]):
 
+## TODO: Step 5
+def getLeafNodes(node, leafNodes=[]):
     # Base case
     if isinstance(node, Leaf):
         leafNodes.append(node)
@@ -341,8 +396,7 @@ def getLeafNodes(node, leafNodes =[]):
     return leafNodes
 
 
-def getInnerNodes(node, innerNodes =[]):
-
+def getInnerNodes(node, innerNodes=[]):
     # Base case
     if isinstance(node, Leaf):
         return
@@ -357,9 +411,9 @@ def getInnerNodes(node, innerNodes =[]):
 
     return innerNodes
 
+
 ## TODO: Step 6
 def computeAccuracy(rows, node):
-
     count = len(rows)
     if count == 0:
         return 0
@@ -369,4 +423,4 @@ def computeAccuracy(rows, node):
         # last entry of the column is the actual label
         if row[-1] == classify(row, node):
             accuracy += 1
-    return round(accuracy/count, 2)
+    return round(accuracy / count, 2)
