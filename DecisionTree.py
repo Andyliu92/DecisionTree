@@ -3,6 +3,12 @@ Authors: Ashwani Kashyap, Anshul Pardhi
 """
 
 import math
+import numpy as np
+from typing import Union, Tuple
+from pathlib import Path
+
+scriptDir = Path(__file__)
+
 
 
 def unique_vals(rows, col):
@@ -17,16 +23,11 @@ def unique_vals(rows, col):
 #######
 
 
-def class_counts(rows):
+def class_counts(rows: np.ndarray) -> dict:
     """Counts the number of each type of example in a dataset."""
-    counts = {}  # a dictionary of label -> count.
-    for row in rows:
-        # in our dataset format, the label is always the last column
-        label = row[-1]
-        if label not in counts:
-            counts[label] = 0
-        counts[label] += 1
-    return counts
+    unique_values, counts = np.unique(rows[:, -1], return_counts=True)
+    label2count = {unique_values[i]: counts[i] for i in range(len(unique_values))}
+    return label2count
 
 
 #######
@@ -35,7 +36,7 @@ def class_counts(rows):
 #######
 
 
-def max_label(dict):
+def max_label(dict:dict):
     max_count = 0
     label = ""
 
@@ -80,7 +81,24 @@ class Question:
         if is_numeric(val):
             return val <= self.value
         else:
+            assert 0, "This version of code deals with pure numerical value"
             return val == self.value
+        
+    def treeTextQuestion(self):
+        # This is just a helper method to print
+        # the question in a readable format.
+        condition = "<="
+        if not is_numeric(self.value):
+            raise NotImplementedError('all values in the feature should be numeric when adding variation.')
+        return "%s %s %s" % (self.header[self.column], condition, str(self.value))
+    
+    def treeTextInverseQuestion(self):
+        # This is just a helper method to print
+        # the question in a readable format.
+        condition = ">"
+        if not is_numeric(self.value):
+            raise NotImplementedError('all values in the feature should be numeric when adding variation.')
+        return "%s %s %s" % (self.header[self.column], condition, str(self.value))
 
     def __repr__(self):
         # This is just a helper method to print
@@ -90,20 +108,17 @@ class Question:
             condition = "<="
         return "Is %s %s %s?" % (self.header[self.column], condition, str(self.value))
 
+    def partition(self, rows: np.ndarray):
+        """Partitions a dataset.
 
-def partition(rows, question: Question):
-    """Partitions a dataset.
-
-    For each row in the dataset, check if it matches the question. If
-    so, add it to 'true rows', otherwise, add it to 'false rows'.
-    """
-    true_rows, false_rows = [], []
-    for row in rows:
-        if question.match(row):
-            true_rows.append(row)
-        else:
-            false_rows.append(row)
-    return true_rows, false_rows
+        For each row in the dataset, check if it matches the question. If
+        so, add it to 'true rows', otherwise, add it to 'false rows'.
+        """
+        # rows = np.array(rows)
+        mask = rows[:, self.column] <= self.value
+        true_rows = rows[mask]
+        false_rows = rows[~mask]
+        return true_rows, false_rows
 
 
 def gini(rows):
@@ -122,11 +137,12 @@ def gini(rows):
 
 
 ## TODO: Step 3
-def entropy(rows):
+def entropy(rows: np.ndarray):
+    assert len(rows.shape) == 2, "error: this function only works with 2-d array!"
     # compute the entropy.
     entries = class_counts(rows)
     avg_entropy = 0
-    size = float(len(rows))
+    size = float(rows.shape[0])
     for label in entries:
         prob = entries[label] / size
         avg_entropy = avg_entropy + (prob * math.log(prob, 2))
@@ -148,6 +164,7 @@ def info_gain(left, right, current_uncertainty):
 def find_best_split(rows, header):
     """Find the best question to ask by iterating over every feature / value
     and calculating the information gain."""
+    raise DeprecationWarning("This function should not be called with variation")
     best_gain = 0  # keep track of the best information gain
     best_question = None  # keep train of the feature / value that produced it
     current_uncertainty = entropy(rows)
@@ -170,7 +187,9 @@ def find_best_split(rows, header):
     return best_gain, best_question
 
 
-def find_best_split_var(rows, header, config: dict):
+def find_best_split_var(
+    rows: np.ndarray, header, config: dict
+) -> Tuple[float, Question]:
     """
     Find the best question to ask by iterating over every feature / value
     and calculating the information gain.
@@ -183,15 +202,18 @@ def find_best_split_var(rows, header, config: dict):
     best_gain = 0  # keep track of the best information gain
     best_question = None  # keep train of the feature / value that produced it
     current_uncertainty = entropy(rows)
-    n_features = len(rows[0]) - 1  # number of columns
+    n_features = rows.shape[1] - 1  # number of columns
 
     for col in range(n_features):  # for each feature
         values = set([row[col] for row in rows])  # unique values in the column
 
         sortedValues = sorted(values)
-        # midPointValues = [(sortedValues[i] + sortedValues[i + 1])/2 for i in range(len(sortedValues) - 1)]
+        midPointValues = [
+            (sortedValues[i] + sortedValues[i + 1]) / 2
+            for i in range(len(sortedValues) - 1)
+        ]
 
-        for val in sortedValues:  # for each value
+        for val in midPointValues:  # for each value
             question = Question(col, val, header)
 
             gain = __calculate_gain(question, rows, current_uncertainty)
@@ -205,9 +227,9 @@ def find_best_split_var(rows, header, config: dict):
     return best_gain, best_question
 
 
-def __calculate_gain(question: Question, rows, currentUncertainty) -> float:
+def __calculate_gain(question: Question, rows: np.ndarray, currentUncertainty) -> float:
     # try splitting the dataset
-    true_rows, false_rows = partition(rows, question)
+    true_rows, false_rows = question.partition(rows)
 
     # Skip this split if it doesn't divide the
     # dataset.
@@ -241,7 +263,7 @@ class Decision_Node:
     This holds a reference to the question, and to the two child nodes.
     """
 
-    def __init__(self, question, true_branch, false_branch, depth, id, rows):
+    def __init__(self, question:Question, true_branch, false_branch, depth, id, rows):
         self.question = question
         self.true_branch = true_branch
         self.false_branch = false_branch
@@ -251,7 +273,7 @@ class Decision_Node:
 
 
 ## TODO: Step 3
-def build_tree(rows, header, config: dict, depth=0, id=0):
+def build_tree(rows: np.ndarray, header, config: dict, depth=0, id=0)-> Decision_Node:
     """Builds the tree.
 
     Rules of recursion: 1) Believe that it works. 2) Start by checking
@@ -277,7 +299,7 @@ def build_tree(rows, header, config: dict, depth=0, id=0):
     # If we reach here, we have found a useful feature / value
     # to partition on.
     # nodeLst.append(id)
-    true_rows, false_rows = partition(rows, question)
+    true_rows, false_rows = question.partition(rows)
 
     # Recursively build the true branch.
     true_branch = build_tree(true_rows, header, config, depth + 1, 2 * id + 2)
@@ -369,6 +391,34 @@ def print_tree(node, spacing=""):
     # Call this function recursively on the false branch
     print(spacing + "--> False:")
     print_tree(node.false_branch, spacing + "  ")
+
+def exportTreeText(node:Decision_Node, outputFile, spacing=""):
+    """World's most elegant tree printing function."""
+
+    # Base case: we've reached a leaf
+    if isinstance(node, Leaf):
+        outputFile.write(
+            spacing + "|---"
+            + " class: "
+            + str(node.predicted_label)+'\n'
+        )
+        return
+
+    # Print the question at this node
+    outputFile.write(
+        spacing + "|---"
+        + str(node.question.treeTextQuestion()) + '\n'
+    )
+    # Call this function recursively on the true branch
+    exportTreeText(node.true_branch, outputFile, spacing + "|   ")
+
+
+    outputFile.write(
+        spacing + "|---"
+        + str(node.question.treeTextInverseQuestion()) + '\n'
+    )
+    # Call this function recursively on the false branch
+    exportTreeText(node.false_branch, outputFile, spacing + "|   ")
 
 
 def print_leaf(counts):

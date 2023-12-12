@@ -12,7 +12,10 @@ import numpy as np
 
 scriptDir = Path(__file__).parent
 configPath = scriptDir.joinpath("config.yml")
+treeTextPath = scriptDir.joinpath('treeText.txt')
 
+N_TRAIN = 500
+N_TEST = 100
 
 with open(configPath, "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
@@ -47,8 +50,10 @@ test_classes_reshaped = test_classes[:, np.newaxis]
 testDF = np.concatenate((test_inputs, test_classes_reshaped), axis=1)
 testDF = testDF.tolist()
 
-header = [f'feature{i}' for i in range(len(trainDF[0])-1)]
-header.append('label')
+trainDF, testDF = np.array(trainDF[0:N_TRAIN]), np.array(testDF[0:N_TEST])
+
+header = [f"feature{i}" for i in range(len(trainDF[0]) - 1)]
+header.append("label")
 
 # building the tree
 t = build_tree(trainDF, header, config)
@@ -69,6 +74,8 @@ for inner in innerNodes:
 maxAccuracy = computeAccuracy(testDF, t)
 print("\nTree before pruning with accuracy: " + str(maxAccuracy * 100) + "\n")
 print_tree(t)
+with open(treeTextPath, mode='w+') as fout:
+    exportTreeText(t, fout)
 
 # TODO: You have to decide on a pruning strategy
 # Pruning strategy
