@@ -1,4 +1,4 @@
 hasWeightVar: true
 weightVar:
-  stdDevRatio: 0.01       # for each feature, the std dev of variation will be stdDevRatio * (max(feature) - min(feature))
-  sampleTimes: 300        # for each mid-point separation value, sample #sampleTimes values of the value after variation for averaging the information gain
+  stdDev: 0.1 # the std dev of variation
+  sampleTimes: 50 # for each mid-point separation value, sample #sampleTimes values of the value after variation for averaging the information gain

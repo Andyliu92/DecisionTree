@@ -28,3 +28,6 @@ def load_data() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     )
 
     return train_inputs, test_inputs, train_classes, test_classes
+
+def load_rand_data(N_TRAIN:int, N_VALIDATION:int, N_TEST:int):
+    return np.load(scriptDir.joinpath(f"{N_TRAIN}train_{N_VALIDATION}validation_{N_TEST}test.npz"))

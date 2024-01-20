@@ -12,10 +12,11 @@ import numpy as np
 
 scriptDir = Path(__file__).parent
 configPath = scriptDir.joinpath("config.yml")
-treeTextPath = scriptDir.joinpath('treeText.txt')
+treeTextPath = scriptDir.joinpath("treeText.txt")
 
-N_TRAIN = 500
-N_TEST = 100
+N_TRAIN = 300
+N_VALIDATION = 100
+N_TEST = -1
 
 with open(configPath, "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
@@ -36,23 +37,40 @@ with open(configPath, "r") as f:
 # splitting the data set into train and test
 # trainDF, testDF = model_selection.train_test_split(lst, test_size=0.2)
 
-train_inputs, test_inputs, train_classes, test_classes = btsc_adapted.load_data()
+dataset = btsc_adapted.load_rand_data(N_TRAIN, N_VALIDATION, N_TEST)
+(
+    train_inputs,
+    train_classes,
+    validation_inputs,
+    validation_classes,
+    test_inputs,
+    test_classes,
+) = (
+    dataset["train_inputs"],
+    dataset["train_classes"],
+    dataset["validation_inputs"],
+    dataset["validation_classes"],
+    dataset["test_inputs"],
+    dataset["test_classes"],
+)
+
 
 # Reshape labels_array to have the same number of dimensions as data_array
 train_classes_reshaped = train_classes[:, np.newaxis]
 # Concatenate data_array and labels_array along the second axis
 trainDF = np.concatenate((train_inputs, train_classes_reshaped), axis=1)
-trainDF = trainDF.tolist()
 
 # Reshape labels_array to have the same number of dimensions as data_array
-test_classes_reshaped = test_classes[:, np.newaxis]
+validation_classes_reshaped = validation_classes[:, np.newaxis]
 # Concatenate data_array and labels_array along the second axis
-testDF = np.concatenate((test_inputs, test_classes_reshaped), axis=1)
-testDF = testDF.tolist()
+validationDF = np.concatenate((validation_inputs, validation_classes_reshaped), axis=1)
 
-trainDF, testDF = np.array(trainDF[0:N_TRAIN]), np.array(testDF[0:N_TEST])
+# # Reshape labels_array to have the same number of dimensions as data_array
+# test_classes_reshaped = test_classes[:, np.newaxis]
+# # Concatenate data_array and labels_array along the second axis
+# testDF = np.concatenate((test_inputs, test_classes_reshaped), axis=1)
 
-header = [f"feature{i}" for i in range(len(trainDF[0]) - 1)]
+header = [f"feature_{i}" for i in range(len(trainDF[0]) - 1)]
 header.append("label")
 
 # building the tree
@@ -71,10 +89,10 @@ for inner in innerNodes:
     print("id = " + str(inner.id) + " depth =" + str(inner.depth))
 
 # print tree
-maxAccuracy = computeAccuracy(testDF, t)
+maxAccuracy = computeAccuracy(validationDF, t)
 print("\nTree before pruning with accuracy: " + str(maxAccuracy * 100) + "\n")
 print_tree(t)
-with open(treeTextPath, mode='w+') as fout:
+with open(treeTextPath, mode="w+") as fout:
     exportTreeText(t, fout)
 
 # TODO: You have to decide on a pruning strategy
@@ -83,7 +101,7 @@ nodeIdToPrune = -1
 for node in innerNodes:
     if node.id != 0:
         prune_tree(t, [node.id])
-        currentAccuracy = computeAccuracy(testDF, t)
+        currentAccuracy = computeAccuracy(validationDF, t)
         print(
             "Pruned node_id: "
             + str(node.id)
@@ -108,6 +126,10 @@ else:
     t = build_tree(trainDF, header, config)
     print("\nPruning strategy did'nt increased accuracy")
 
+print_tree(t)
+with open(treeTextPath, mode="w+") as fout:
+    exportTreeText(t, fout)
+
 print("\n********************************************************************")
 print(
     "*********** Final Tree with accuracy: "
@@ -115,4 +137,3 @@ print(
     + "%  ************"
 )
 print("********************************************************************\n")
-print_tree(t)

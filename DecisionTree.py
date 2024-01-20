@@ -164,7 +164,7 @@ def info_gain(left, right, current_uncertainty):
 def find_best_split(rows, header):
     """Find the best question to ask by iterating over every feature / value
     and calculating the information gain."""
-    raise DeprecationWarning("This function should not be called with variation")
+    # raise DeprecationWarning("This function should not be called with variation")
     best_gain = 0  # keep track of the best information gain
     best_question = None  # keep train of the feature / value that produced it
     current_uncertainty = entropy(rows)
@@ -203,6 +203,8 @@ def find_best_split_var(
     best_question = None  # keep train of the feature / value that produced it
     current_uncertainty = entropy(rows)
     n_features = rows.shape[1] - 1  # number of columns
+    sampleTimes = config['weightVar']['sampleTimes']
+    varStdDev = config['weightVar']['stdDev']
 
     for col in range(n_features):  # for each feature
         values = set([row[col] for row in rows])  # unique values in the column
@@ -214,16 +216,19 @@ def find_best_split_var(
         ]
 
         for val in midPointValues:  # for each value
-            question = Question(col, val, header)
+            gain = 0
+            for i in range(sampleTimes):
+                valWithVar = val + np.random.normal(0, varStdDev)
+                question = Question(col, valWithVar, header)
 
-            gain = __calculate_gain(question, rows, current_uncertainty)
+                gain += __calculate_gain(question, rows, current_uncertainty)
 
             # You actually can use '>' instead of '>=' here
             # but I wanted the tree to look a certain way for our
             # toy dataset.
+            gain /= sampleTimes
             if gain >= best_gain:
-                best_gain, best_question = gain, question
-
+                best_gain, best_question = gain, Question(col, val, header)
     return best_gain, best_question
 
 
@@ -284,6 +289,8 @@ def build_tree(rows: np.ndarray, header, config: dict, depth=0, id=0)-> Decision
     # Try partitioing the dataset on each of the unique attribute,
     # calculate the information gain,
     # and return the question that produces the highest gain.
+
+    # print(rows)
 
     if config["hasWeightVar"]:
         gain, question = find_best_split_var(rows, header, config)
