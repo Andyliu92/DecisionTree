@@ -9,14 +9,39 @@ import yaml
 from pathlib import Path
 import dataset.BelgiumTSC.BTSC_adapted as btsc_adapted
 import numpy as np
+import argparse
 
 scriptDir = Path(__file__).parent
-configPath = scriptDir.joinpath("config.yml")
-treeTextPath = scriptDir.joinpath("treeText.txt")
+outputDie = scriptDir.joinpath('outputs')
 
-N_TRAIN = 300
-N_VALIDATION = 100
-N_TEST = -1
+parser = argparse.ArgumentParser(description="")
+
+parser.add_argument(
+    "--n_train", type=int, default=300, help="Use n_train samples for training"
+)
+parser.add_argument(
+    "--n_validation", type=int, default=100, help="Use n_validation samples for validation"
+)
+parser.add_argument(
+    "--n_test", type=int, default=-1, help="Use n_test samples for testing"
+)
+parser.add_argument(
+    '--output_path', type=str, default='treeText.txt', help='Tree text output path'
+)
+parser.add_argument(
+    '--config', type=str, default='config.yml', help='The config file path'
+)
+
+args = parser.parse_args()
+
+N_TRAIN = args.n_train
+N_VALIDATION = args.n_validation
+N_TEST = args.n_test
+treeTextPath = scriptDir.joinpath(args.output_path)
+configPath = scriptDir.joinpath(args.config)
+
+if not treeTextPath.parent.exists():
+    treeTextPath.parent.mkdir(parents=True)
 
 with open(configPath, "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
