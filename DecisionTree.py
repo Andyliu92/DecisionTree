@@ -6,9 +6,10 @@ import math
 import numpy as np
 from typing import Union, Tuple
 from pathlib import Path
+from copy import deepcopy
+import re
 
 scriptDir = Path(__file__)
-
 
 
 def unique_vals(rows, col):
@@ -36,7 +37,7 @@ def class_counts(rows: np.ndarray) -> dict:
 #######
 
 
-def max_label(dict:dict):
+def max_label(dict: dict):
     max_count = 0
     label = ""
 
@@ -83,21 +84,25 @@ class Question:
         else:
             assert 0, "This version of code deals with pure numerical value"
             return val == self.value
-        
+
     def treeTextQuestion(self):
         # This is just a helper method to print
         # the question in a readable format.
         condition = "<="
         if not is_numeric(self.value):
-            raise NotImplementedError('all values in the feature should be numeric when adding variation.')
+            raise NotImplementedError(
+                "all values in the feature should be numeric when adding variation."
+            )
         return "%s %s %s" % (self.header[self.column], condition, str(self.value))
-    
+
     def treeTextInverseQuestion(self):
         # This is just a helper method to print
         # the question in a readable format.
         condition = ">"
         if not is_numeric(self.value):
-            raise NotImplementedError('all values in the feature should be numeric when adding variation.')
+            raise NotImplementedError(
+                "all values in the feature should be numeric when adding variation."
+            )
         return "%s %s %s" % (self.header[self.column], condition, str(self.value))
 
     def __repr__(self):
@@ -203,8 +208,8 @@ def find_best_split_var(
     best_question = None  # keep train of the feature / value that produced it
     current_uncertainty = entropy(rows)
     n_features = rows.shape[1] - 1  # number of columns
-    sampleTimes = config['weightVar']['sampleTimes']
-    varStdDev = config['weightVar']['stdDev']
+    sampleTimes = config["weightVar"]["sampleTimes"]
+    varStdDev = config["weightVar"]["stdDev"]
 
     for col in range(n_features):  # for each feature
         values = set([row[col] for row in rows])  # unique values in the column
@@ -254,11 +259,12 @@ class Leaf:
     it appears in the rows from the training data that reach this leaf.
     """
 
-    def __init__(self, rows, id, depth):
+    def __init__(self, rows, id, depth, type: str):
         self.predictions = class_counts(rows)
         self.predicted_label = max_label(self.predictions)
         self.id = id
         self.depth = depth
+        self.type = type
 
 
 ## TODO: Step 1
@@ -268,17 +274,22 @@ class Decision_Node:
     This holds a reference to the question, and to the two child nodes.
     """
 
-    def __init__(self, question:Question, true_branch, false_branch, depth, id, rows):
+    def __init__(
+        self, question: Question, true_branch, false_branch, depth, id, rows, type: str
+    ):
         self.question = question
         self.true_branch = true_branch
         self.false_branch = false_branch
         self.depth = depth
         self.id = id
         self.rows = rows
+        self.type = type
 
 
 ## TODO: Step 3
-def build_tree(rows: np.ndarray, header, config: dict, depth=0, id=0)-> Decision_Node:
+def build_tree(
+    rows: np.ndarray, header, config: dict, depth=0, id=0
+) -> Union[Decision_Node, Leaf]:
     """Builds the tree.
 
     Rules of recursion: 1) Believe that it works. 2) Start by checking
@@ -301,7 +312,7 @@ def build_tree(rows: np.ndarray, header, config: dict, depth=0, id=0)-> Decision
     # Since we can ask no further questions,
     # we'll return a leaf.
     if gain == 0:
-        return Leaf(rows, id, depth)
+        return Leaf(rows, id, depth, "original")
 
     # If we reach here, we have found a useful feature / value
     # to partition on.
@@ -318,7 +329,9 @@ def build_tree(rows: np.ndarray, header, config: dict, depth=0, id=0)-> Decision
     # This records the best feature / value to ask at this point,
     # as well as the branches to follow
     # depending on on the answer.
-    return Decision_Node(question, true_branch, false_branch, depth, id, rows)
+    return Decision_Node(
+        question, true_branch, false_branch, depth, id, rows, "original"
+    )
 
 
 ## TODO: Step 8 - already done for you
@@ -336,7 +349,7 @@ def prune_tree(node, prunedList):
     # If we reach a pruned node, make that node a leaf node and return. Since it becomes a leaf node, the nodes
     # below it are automatically not considered
     if int(node.id) in prunedList:
-        return Leaf(node.rows, node.id, node.depth)
+        return Leaf(node.rows, node.id, node.depth, "original")
 
     # Call this function recursively on the true branch
     node.true_branch = prune_tree(node.true_branch, prunedList)
@@ -399,30 +412,24 @@ def print_tree(node, spacing=""):
     print(spacing + "--> False:")
     print_tree(node.false_branch, spacing + "  ")
 
-def exportTreeText(node:Decision_Node, outputFile, spacing=""):
+
+def exportTreeText(node: Decision_Node, outputFile, spacing=""):
     """World's most elegant tree printing function."""
 
     # Base case: we've reached a leaf
     if isinstance(node, Leaf):
         outputFile.write(
-            spacing + "|---"
-            + " class: "
-            + str(node.predicted_label)+'\n'
+            spacing + "|---" + " class: " + str(node.predicted_label) + "\n"
         )
         return
 
     # Print the question at this node
-    outputFile.write(
-        spacing + "|---"
-        + str(node.question.treeTextQuestion()) + '\n'
-    )
+    outputFile.write(spacing + "|---" + str(node.question.treeTextQuestion()) + "\n")
     # Call this function recursively on the true branch
     exportTreeText(node.true_branch, outputFile, spacing + "|   ")
 
-
     outputFile.write(
-        spacing + "|---"
-        + str(node.question.treeTextInverseQuestion()) + '\n'
+        spacing + "|---" + str(node.question.treeTextInverseQuestion()) + "\n"
     )
     # Call this function recursively on the false branch
     exportTreeText(node.false_branch, outputFile, spacing + "|   ")
@@ -481,3 +488,126 @@ def computeAccuracy(rows, node):
         if row[-1] == classify(row, node):
             accuracy += 1
     return round(accuracy / count, 2)
+
+
+def copyTree(node: Union[Decision_Node, Leaf]) -> Union[Decision_Node, Leaf]:
+    if isinstance(node, Leaf):
+        result = deepcopy(node)
+        result.type = "copied"
+        return result
+    elif isinstance(node, Decision_Node):
+        return Decision_Node(
+            node.question,
+            copyTree(node.true_branch),
+            copyTree(node.false_branch),
+            node.depth,
+            node.id,
+            node.rows,
+            "copied",
+        )
+    else:
+        raise NotImplementedError("unexpected node class")
+
+
+# Parse the tree structure text into a nested dictionary
+def parseTreeStructure(
+    text: str,
+) -> Union[Decision_Node, Leaf]:
+    """
+    this function takes a tree text and returns the parsed tree structure and all leaf nodes, and all feature ids, class ids, and thresholds used in the tree.
+    """
+    lines = text.strip().split("\n")
+
+    leafNodes = []
+    featureIDs = []
+    classIDs = []
+    thresholds = []
+    (
+        treeDict,
+        subTreeEndLineID,
+        leafNodes,
+        featureIDs,
+        classIDs,
+        thresholds,
+    ) = __parseSubTree(lines, 0, leafNodes, featureIDs, classIDs, thresholds)
+    assert (
+        subTreeEndLineID == len(lines) - 1
+    ), "ERROR: the tree is not completely parsed!"
+
+    return treeDict
+
+
+__nodeUID = 0  # add an uid to make each node unique
+
+
+def __parseSubTree(
+    lines: list[str],
+    lineID: int,
+    # parentNode: Union[dict, None],
+    leafNodes: list[dict],
+    featureIDs: list[int],
+    classIDs: list[int],
+    thresholds: list[float],
+) -> Tuple[
+    Union[Leaf, Decision_Node], int, list[dict], list[int], list[int], list[float]
+]:
+    """
+    this function takes all lines of a tree, the line id where the subtree to be parsed starts, and the pointer to parentNode.
+    this function returns the parsed sub tree and the line id where the subtree ends(not the id where the following structure of tree starts!).
+    """
+    global __nodeUID
+    if "class:" in lines[lineID]:  # this subtree is a leaf node
+        classID = re.search("[0-9]+.?0?", lines[lineID]).group()
+        classID = int(classID.strip().split(".")[0])
+        # leafNode = {"class": classID, "parent": parentNode, "uid": __nodeUID}
+        leafNode = Leaf(np.array([[0]]), __nodeUID, 0, "loaded")
+        leafNode.predicted_label = classID
+        __nodeUID += 1
+        leafNodes.append(leafNode)
+        if classID not in classIDs:
+            classIDs.append(classID)
+        return (leafNode, lineID, leafNodes, featureIDs, classIDs, thresholds)
+    elif re.search(
+        "feature_[0-9]+ <=", lines[lineID]
+    ):  # is a stem node, parse recursively
+        # the following code assumes that le and ge nodes both exists!
+        # stemNode = {
+        #     "featureID": int,
+        #     "threshold": float,
+        #     "leNode": dict,  # less or equal. e.g. feature 3 <= 4
+        #     "gtNode": dict,  # greater than.  e.g. feature 3 >  4
+        #     "parent": Union[None, dict],
+        #     "uid": __nodeUID,
+        # }
+        __nodeUID += 1
+        matchStr = re.search("feature_[0-9]+", lines[lineID]).group()
+        featureID = int(matchStr.split("_")[1])
+        if featureID not in featureIDs:
+            featureIDs.append(featureID)
+        matchStr = re.search("<=[ ]+[-]?[0-9]+.[0-9]+", lines[lineID]).group()
+        threshold = float(matchStr.split(" ")[-1])
+        thresholds.append(threshold)
+        leNode, endLineId, leafNodes, featureIDs, classIDs, thresholds = __parseSubTree(
+            lines, lineID + 1, leafNodes, featureIDs, classIDs, thresholds
+        )
+        assert re.search(
+            f"feature_{featureID} >", lines[endLineId + 1]
+        ), "ERROR: the gt branch does not follow the end of last sub tree."
+        gtNode, endLineId, leafNodes, featureIDs, classIDs, thresholds = __parseSubTree(
+            lines, endLineId + 2, leafNodes, featureIDs, classIDs, thresholds
+        )
+        # stemNode["featureID"] = featureID
+        # stemNode["threshold"] = threshold
+        # stemNode["leNode"] = leNode
+        # stemNode["gtNode"] = gtNode
+
+        question = Question(featureID, threshold, f"feature_{featureID}")
+
+        stemNode = Decision_Node(question, leNode, gtNode, 0, __nodeUID, np.array([[0]]), "loaded")
+
+        return stemNode, endLineId, leafNodes, featureIDs, classIDs, thresholds
+    else:
+        assert not re.search(
+            "truncated", lines[lineID]
+        ), "Tree too deep. Some branch is truncated in tree text"
+        raise NotImplementedError

@@ -9,6 +9,7 @@ import yaml
 from pathlib import Path
 import dataset.BelgiumTSC.BTSC_adapted as btsc_adapted
 import numpy as np
+from sklearn.metrics import accuracy_score
 
 scriptDir = Path(__file__).parent
 configPath = scriptDir.joinpath("config.yml")
@@ -73,68 +74,17 @@ validationDF = np.concatenate((validation_inputs, validation_classes_reshaped), 
 header = [f"feature_{i}" for i in range(len(trainDF[0]) - 1)]
 header.append("label")
 
-# building the tree
-T_ORIGINAL = build_tree(trainDF, header, config)
-t = copyTree(T_ORIGINAL)
+# load the tree
+with open('./treeText.txt', mode='r+') as fin:
+    treeText = fin.read()
 
-# get leaf and inner nodes
-print("\nLeaf nodes ****************")
-leaves = getLeafNodes(t)
-for leaf in leaves:
-    print("id = " + str(leaf.id) + " depth =" + str(leaf.depth))
+t = parseTreeStructure(treeText)
 
-print("\nNon-leaf nodes ****************")
-innerNodes = getInnerNodes(t)
+pred = []
+for row in validation_inputs:
+    pred.append(classify(row, t))
 
-for inner in innerNodes:
-    print("id = " + str(inner.id) + " depth =" + str(inner.depth))
-
-# print tree
-maxAccuracy = computeAccuracy(validationDF, t)
-print("\nTree before pruning with accuracy: " + str(maxAccuracy * 100) + "\n")
-print_tree(t)
-with open(treeTextPath, mode="w+") as fout:
-    exportTreeText(t, fout)
-
-# TODO: You have to decide on a pruning strategy
-# Pruning strategy
-nodeIdToPrune = -1
-for node in innerNodes:
-    if node.id != 0:
-        prune_tree(t, [node.id])
-        currentAccuracy = computeAccuracy(validationDF, t)
-        print(
-            "Pruned node_id: "
-            + str(node.id)
-            + " to achieve accuracy: "
-            + str(currentAccuracy * 100)
-            + "%"
-        )
-        # print("Pruned Tree")
-        # print_tree(t)
-        if currentAccuracy > maxAccuracy:
-            maxAccuracy = currentAccuracy
-            nodeIdToPrune = node.id
-        t = copyTree(T_ORIGINAL)
-        if maxAccuracy == 1:
-            break
-
-if nodeIdToPrune != -1:
-    t = copyTree(T_ORIGINAL)
-    prune_tree(t, [nodeIdToPrune])
-    print("\nFinal node Id to prune (for max accuracy): " + str(nodeIdToPrune))
-else:
-    t = copyTree(T_ORIGINAL)
-    print("\nPruning strategy did'nt increased accuracy")
-
-print_tree(t)
-with open(treeTextPath, mode="w+") as fout:
-    exportTreeText(t, fout)
-
-print("\n********************************************************************")
-print(
-    "*********** Final Tree with accuracy: "
-    + str(maxAccuracy * 100)
-    + "%  ************"
-)
-print("********************************************************************\n")
+print(pred)
+print(validation_classes)
+accu = accuracy_score(validation_classes, pred)
+print(f'Reached accuracy: {accu}')
