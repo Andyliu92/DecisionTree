@@ -11,7 +11,7 @@ import dataset.BelgiumTSC.BTSC_adapted as btsc_adapted
 import numpy as np
 from sklearn.metrics import accuracy_score
 import argparse
-from DecisionTree import copyTree, exportTreeText
+from DecisionTree import *
 
 parser = argparse.ArgumentParser(description="")
 
@@ -69,11 +69,10 @@ def main():
     for i in range(sampleTimes):
         t = copyTree(T_ORIGINAL)
         
-        addWeightVariation(t)
+        addWeightVariation(t, config)
         accu += pred(t, validation_inputs, validation_classes, printResult=False)
     accu /= sampleTimes
     print(f'Average inference accuracy: {accu}')
-
 
 def pred(
     rootNode: Union[Decision_Node, Leaf],
@@ -90,29 +89,6 @@ def pred(
         print(f"Inference accuracy: {accu}")
 
     return float(accu)
-
-
-def loadTree(treeTextPath: Path) -> Union[Leaf, Decision_Node]:
-    # load the tree
-    with open(treeTextPath, mode="r") as fin:
-        treeText = fin.read()
-
-    return parseTreeStructure(treeText)
-
-
-def addWeightVariation(node: Union[Decision_Node, Leaf]):
-    assert (
-        config["hasWeightVar"] == True
-    ), "config file indicates no variation but addWeightVariation() is called!"
-
-    if isinstance(node, Leaf):
-        return
-    else:
-        q = node.question
-        q.setValue(q.getValue() + np.random.normal(0, config["weightVar"]["stdDev"]))
-
-        addWeightVariation(node.true_branch)
-        addWeightVariation(node.false_branch)
 
 
 if __name__ == "__main__":

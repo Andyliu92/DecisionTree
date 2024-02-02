@@ -70,7 +70,7 @@ class Question:
     question. See the demo below.
     """
 
-    def __init__(self, column, value:Union[int, float], header):
+    def __init__(self, column, value:int, header):
         self.column = column
         self.value = value
         self.header = header
@@ -425,7 +425,7 @@ def exportTreeText(node: Decision_Node, outputFile, spacing=""):
     # Base case: we've reached a leaf
     if isinstance(node, Leaf):
         outputFile.write(
-            spacing + "|---" + " class: " + str(node.predicted_label) + "\n"
+            spacing + "|---" + " class: " + str(float(node.predicted_label)) + "\n"
         )
         return
 
@@ -446,7 +446,7 @@ def getTreeText(node: Decision_Node, initText='' , spacing="") -> str:
     # Base case: we've reached a leaf
     if isinstance(node, Leaf):
         initText += (
-            spacing + "|---" + " class: " + str(node.predicted_label) + "\n"
+            spacing + "|---" + " class: " + str(float(node.predicted_label)) + "\n"
         )
         return initText
 
@@ -518,22 +518,26 @@ def computeAccuracy(rows, node):
             accuracy += 1
     return round(accuracy / count, 2)
 
-
+__copyTreeNodeID = 0
 def copyTree(node: Union[Decision_Node, Leaf]) -> Union[Decision_Node, Leaf]:
+    global __copyTreeNodeID
     if isinstance(node, Leaf):
         result = deepcopy(node)
-        result.type = "copied"
+        result.type = f"copied, id{__copyTreeNodeID}"
+        __copyTreeNodeID += 1
         return result
     elif isinstance(node, Decision_Node):
-        return Decision_Node(
+        node = deepcopy(Decision_Node(
             node.question,
             copyTree(node.true_branch),
             copyTree(node.false_branch),
             node.depth,
             node.id,
             node.rows,
-            "copied",
-        )
+            f"copied, id{__copyTreeNodeID}",
+        ))
+        __copyTreeNodeID += 1
+        return node
     else:
         raise NotImplementedError("unexpected node class")
 
@@ -641,3 +645,26 @@ def __parseSubTree(
             "truncated", lines[lineID]
         ), "Tree too deep. Some branch is truncated in tree text"
         raise NotImplementedError
+
+
+def loadTree(treeTextPath: Path) -> Union[Leaf, Decision_Node]:
+    # load the tree
+    with open(treeTextPath, mode="r") as fin:
+        treeText = fin.read()
+
+    return parseTreeStructure(treeText)
+
+
+def addWeightVariation(node: Union[Decision_Node, Leaf], config:dict):
+    assert (
+        config["hasWeightVar"] == True
+    ), "config file indicates no variation but addWeightVariation() is called!"
+
+    if isinstance(node, Leaf):
+        return
+    else:
+        q = node.question
+        q.setValue(q.getValue() + np.random.normal(0, config["weightVar"]["stdDev"]))
+
+        addWeightVariation(node.true_branch, config)
+        addWeightVariation(node.false_branch, config)
