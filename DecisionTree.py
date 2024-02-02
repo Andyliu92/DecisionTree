@@ -182,22 +182,53 @@ def find_best_split(rows, header):
     current_uncertainty = entropy(rows)
     n_features = len(rows[0]) - 1  # number of columns
 
+    argumentList = []
     for col in range(n_features):  # for each feature
-        values = set([row[col] for row in rows])  # unique values in the column
+        argumentList.append(
+            {
+                "col": col,
+                "rows": rows,
+                "header": header,
+                "current_uncertainty": current_uncertainty,
+            }
+        )
 
-        for val in values:  # for each value
-            question = Question(col, val, header)
+    num_processes = multiprocessing.cpu_count()
 
-            gain = __calculate_gain(question, rows, current_uncertainty)
+    with multiprocessing.Pool(num_processes) as pool:
+        results = pool.map(__col_best_gain_runner, argumentList)
 
-            # You actually can use '>' instead of '>=' here
-            # but I wanted the tree to look a certain way for our
-            # toy dataset.
-            if gain >= best_gain:
-                best_gain, best_question = gain, question
+    for colResult in results:
+        if colResult[0] >= best_gain:
+            best_gain, best_question = colResult[0], colResult[1]
 
     return best_gain, best_question
 
+def __col_best_gain_runner(args:dict) -> Tuple[float, Question]:
+    (col, rows, header, current_uncertainty) = (
+        args["col"],
+        args["rows"],
+        args["header"],
+        args["current_uncertainty"],
+    )
+
+    best_gain = 0  # keep track of the best information gain
+    best_question = None  # keep train of the feature / value that produced it
+    values = set([row[col] for row in rows])  # unique values in the column
+
+    for val in values:  # for each value
+        question = Question(col, val, header)
+
+        gain = __calculate_gain(question, rows, current_uncertainty)
+
+        # You actually can use '>' instead of '>=' here
+        # but I wanted the tree to look a certain way for our
+        # toy dataset.
+        if gain >= best_gain:
+            best_gain, best_question = gain, question
+    
+    return best_gain, best_question
+        
 
 def find_best_split_var(
     rows: np.ndarray, header, config: dict
@@ -235,7 +266,7 @@ def find_best_split_var(
     # num_processes = 7
 
     with multiprocessing.Pool(num_processes) as pool:
-        results = pool.map(__col_best_gain_runner, argumentList)
+        results = pool.map(__col_best_gain_var_runner, argumentList)
 
     for colResult in results:
         if colResult[0] >= best_gain:
@@ -243,14 +274,14 @@ def find_best_split_var(
     return best_gain, best_question
 
 
-def __col_best_gain_runner(config: dict) -> Tuple[float, Question]:
+def __col_best_gain_var_runner(args: dict) -> Tuple[float, Question]:
     (col, rows, sampleTimes, varStdDev, header, current_uncertainty) = (
-        config["col"],
-        config["rows"],
-        config["sampleTimes"],
-        config["varStdDev"],
-        config["header"],
-        config["current_uncertainty"],
+        args["col"],
+        args["rows"],
+        args["sampleTimes"],
+        args["varStdDev"],
+        args["header"],
+        args["current_uncertainty"],
     )
 
     best_gain = 0  # keep track of the best information gain
