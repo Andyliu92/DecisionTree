@@ -33,6 +33,8 @@ train_inputs, train_classes = train_inputs[randIndex], train_classes[randIndex]
 validation_inputs = deepcopy(train_inputs)
 validation_classes = deepcopy(train_classes)
 
+assert N_TRAIN <= train_inputs.shape[0]
+
 train_inputs, train_classes = train_inputs[0:N_TRAIN, :], train_classes[0:N_TRAIN]
 
 assert N_TRAIN + N_VALIDATION <= validation_inputs.shape[0]

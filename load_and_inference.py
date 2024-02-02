@@ -10,81 +10,110 @@ from pathlib import Path
 import dataset.BelgiumTSC.BTSC_adapted as btsc_adapted
 import numpy as np
 from sklearn.metrics import accuracy_score
+import argparse
+from DecisionTree import copyTree, exportTreeText
+
+parser = argparse.ArgumentParser(description="")
+
+parser.add_argument(
+    "--tree_text",
+    type=str,
+    default="treeText.txt",
+    help="The path of the trained tree text",
+)
+parser.add_argument(
+    "--n_train", type=int, default=300, help="Use n_train samples for training"
+)
+parser.add_argument(
+    "--n_validation",
+    type=int,
+    default=100,
+    help="Use n_validation samples for validation",
+)
+parser.add_argument(
+    "--n_test", type=int, default=-1, help="Use n_test samples for testing"
+)
+parser.add_argument(
+    "--config", type=str, default="config.yml", help="The config file path"
+)
+
+args = parser.parse_args()
 
 scriptDir = Path(__file__).parent
-configPath = scriptDir.joinpath("config.yml")
-treeTextPath = scriptDir.joinpath("treeText.txt")
+treeTextPath = scriptDir.joinpath(args.tree_text)
+configPath = scriptDir.joinpath(args.config)
 
-N_TRAIN = 300
-N_VALIDATION = 100
-N_TEST = -1
+N_TRAIN = args.n_train
+N_VALIDATION = args.n_validation
+N_TEST = args.n_test
 
 with open(configPath, "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
-# # default data set
-# df = pd.read_csv('dataset/Social_Network_Ads.csv')
-# header = list(df.columns)
 
-# # overwrite your data set here
-# # header = ['SepalL', 'SepalW', 'PetalL', 'PetalW', 'Class']
-# # df = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data', header=None, names=['SepalL','SepalW','PetalL','PetalW','Class'])
-# # data-set link: https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer/
-# # df = pd.read_csv('data_set/breast-cancer.csv')
+def main():
+    dataset = btsc_adapted.load_rand_data(N_TRAIN, N_VALIDATION, N_TEST)
+    (
+        validation_inputs,
+        validation_classes,
+    ) = (
+        dataset["validation_inputs"],
+        dataset["validation_classes"],
+    )
 
+    T_ORIGINAL = loadTree(treeTextPath)
+    pred(T_ORIGINAL, validation_inputs, validation_classes)
 
-# lst = df.values.tolist()
-
-# splitting the data set into train and test
-# trainDF, testDF = model_selection.train_test_split(lst, test_size=0.2)
-
-dataset = btsc_adapted.load_rand_data(N_TRAIN, N_VALIDATION, N_TEST)
-(
-    train_inputs,
-    train_classes,
-    validation_inputs,
-    validation_classes,
-    test_inputs,
-    test_classes,
-) = (
-    dataset["train_inputs"],
-    dataset["train_classes"],
-    dataset["validation_inputs"],
-    dataset["validation_classes"],
-    dataset["test_inputs"],
-    dataset["test_classes"],
-)
+    sampleTimes = config["weightVar"]["sampleTimes"]
+    accu = 0
+    for i in range(sampleTimes):
+        t = copyTree(T_ORIGINAL)
+        
+        addWeightVariation(t)
+        accu += pred(t, validation_inputs, validation_classes, printResult=False)
+    accu /= sampleTimes
+    print(f'Average inference accuracy: {accu}')
 
 
-# Reshape labels_array to have the same number of dimensions as data_array
-train_classes_reshaped = train_classes[:, np.newaxis]
-# Concatenate data_array and labels_array along the second axis
-trainDF = np.concatenate((train_inputs, train_classes_reshaped), axis=1)
+def pred(
+    rootNode: Union[Decision_Node, Leaf],
+    inputs: np.ndarray,
+    classes: np.ndarray,
+    printResult=True,
+) -> float:
+    pred = []
+    for row in inputs:
+        pred.append(classify(row, rootNode))
 
-# Reshape labels_array to have the same number of dimensions as data_array
-validation_classes_reshaped = validation_classes[:, np.newaxis]
-# Concatenate data_array and labels_array along the second axis
-validationDF = np.concatenate((validation_inputs, validation_classes_reshaped), axis=1)
+    accu = accuracy_score(classes, pred)
+    if printResult:
+        print(f"Inference accuracy: {accu}")
 
-# # Reshape labels_array to have the same number of dimensions as data_array
-# test_classes_reshaped = test_classes[:, np.newaxis]
-# # Concatenate data_array and labels_array along the second axis
-# testDF = np.concatenate((test_inputs, test_classes_reshaped), axis=1)
+    return float(accu)
 
-header = [f"feature_{i}" for i in range(len(trainDF[0]) - 1)]
-header.append("label")
 
-# load the tree
-with open('./treeText.txt', mode='r+') as fin:
-    treeText = fin.read()
+def loadTree(treeTextPath: Path) -> Union[Leaf, Decision_Node]:
+    # load the tree
+    with open(treeTextPath, mode="r") as fin:
+        treeText = fin.read()
 
-t = parseTreeStructure(treeText)
+    return parseTreeStructure(treeText)
 
-pred = []
-for row in validation_inputs:
-    pred.append(classify(row, t))
 
-print(pred)
-print(validation_classes)
-accu = accuracy_score(validation_classes, pred)
-print(f'Reached accuracy: {accu}')
+def addWeightVariation(node: Union[Decision_Node, Leaf]):
+    assert (
+        config["hasWeightVar"] == True
+    ), "config file indicates no variation but addWeightVariation() is called!"
+
+    if isinstance(node, Leaf):
+        return
+    else:
+        q = node.question
+        q.setValue(q.getValue() + np.random.normal(0, config["weightVar"]["stdDev"]))
+
+        addWeightVariation(node.true_branch)
+        addWeightVariation(node.false_branch)
+
+
+if __name__ == "__main__":
+    main()

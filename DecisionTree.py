@@ -70,7 +70,7 @@ class Question:
     question. See the demo below.
     """
 
-    def __init__(self, column, value, header):
+    def __init__(self, column, value:Union[int, float], header):
         self.column = column
         self.value = value
         self.header = header
@@ -124,6 +124,12 @@ class Question:
         true_rows = rows[mask]
         false_rows = rows[~mask]
         return true_rows, false_rows
+    
+    def getValue(self)->Union[int, float]:
+        return self.value
+    
+    def setValue(self, value: Union[int, float]):
+        self.value = value
 
 
 def gini(rows):
@@ -434,6 +440,29 @@ def exportTreeText(node: Decision_Node, outputFile, spacing=""):
     # Call this function recursively on the false branch
     exportTreeText(node.false_branch, outputFile, spacing + "|   ")
 
+def getTreeText(node: Decision_Node, initText='' , spacing="") -> str:
+    """World's most elegant tree printing function."""
+
+    # Base case: we've reached a leaf
+    if isinstance(node, Leaf):
+        initText += (
+            spacing + "|---" + " class: " + str(node.predicted_label) + "\n"
+        )
+        return initText
+
+    # Print the question at this node
+    initText += (spacing + "|---" + str(node.question.treeTextQuestion()) + "\n")
+    # Call this function recursively on the true branch
+    initText = getTreeText(node.true_branch, initText, spacing + "|   ")
+
+    initText += (
+        spacing + "|---" + str(node.question.treeTextInverseQuestion()) + "\n"
+    )
+    # Call this function recursively on the false branch
+    initText = getTreeText(node.false_branch, initText, spacing + "|   ")
+
+    return initText
+
 
 def print_leaf(counts):
     """A nicer way to print the predictions at a leaf."""
@@ -511,7 +540,7 @@ def copyTree(node: Union[Decision_Node, Leaf]) -> Union[Decision_Node, Leaf]:
 
 # Parse the tree structure text into a nested dictionary
 def parseTreeStructure(
-    text: str,
+    text: str, header=[f'feature_{i}' for i in range(1024)]
 ) -> Union[Decision_Node, Leaf]:
     """
     this function takes a tree text and returns the parsed tree structure and all leaf nodes, and all feature ids, class ids, and thresholds used in the tree.
@@ -529,7 +558,7 @@ def parseTreeStructure(
         featureIDs,
         classIDs,
         thresholds,
-    ) = __parseSubTree(lines, 0, leafNodes, featureIDs, classIDs, thresholds)
+    ) = __parseSubTree(lines, 0, leafNodes, featureIDs, classIDs, thresholds, header)
     assert (
         subTreeEndLineID == len(lines) - 1
     ), "ERROR: the tree is not completely parsed!"
@@ -548,6 +577,7 @@ def __parseSubTree(
     featureIDs: list[int],
     classIDs: list[int],
     thresholds: list[float],
+    header: list[str]
 ) -> Tuple[
     Union[Leaf, Decision_Node], int, list[dict], list[int], list[int], list[float]
 ]:
@@ -588,20 +618,20 @@ def __parseSubTree(
         threshold = float(matchStr.split(" ")[-1])
         thresholds.append(threshold)
         leNode, endLineId, leafNodes, featureIDs, classIDs, thresholds = __parseSubTree(
-            lines, lineID + 1, leafNodes, featureIDs, classIDs, thresholds
+            lines, lineID + 1, leafNodes, featureIDs, classIDs, thresholds, header
         )
         assert re.search(
             f"feature_{featureID} >", lines[endLineId + 1]
         ), "ERROR: the gt branch does not follow the end of last sub tree."
         gtNode, endLineId, leafNodes, featureIDs, classIDs, thresholds = __parseSubTree(
-            lines, endLineId + 2, leafNodes, featureIDs, classIDs, thresholds
+            lines, endLineId + 2, leafNodes, featureIDs, classIDs, thresholds, header
         )
         # stemNode["featureID"] = featureID
         # stemNode["threshold"] = threshold
         # stemNode["leNode"] = leNode
         # stemNode["gtNode"] = gtNode
 
-        question = Question(featureID, threshold, f"feature_{featureID}")
+        question = Question(featureID, threshold, header)
 
         stemNode = Decision_Node(question, leNode, gtNode, 0, __nodeUID, np.array([[0]]), "loaded")
 
