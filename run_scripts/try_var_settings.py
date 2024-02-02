@@ -109,10 +109,13 @@ def run_exp(
             )
 
     # num_processes = multiprocessing.cpu_count()
-    num_processes = 7
+    num_processes = 1
 
     with multiprocessing.Pool(num_processes) as pool:
         pool.map(runner, settingsList)
+
+    # for settings in settingsList:
+    #     runner(settings)
 
     accuResult= getAccu(outputDir, accuResult)
 

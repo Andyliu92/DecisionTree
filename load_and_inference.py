@@ -12,6 +12,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 import argparse
 from DecisionTree import *
+import multiprocessing
 
 parser = argparse.ArgumentParser(description="")
 
@@ -65,14 +66,45 @@ def main():
     pred(T_ORIGINAL, validation_inputs, validation_classes)
 
     sampleTimes = config["weightVar"]["sampleTimes"]
+
+    numProcesses = multiprocessing.cpu_count()
+    sampleTimesList = []
+    for i in range(numProcesses - 1):
+        sampleTimesList.append(int(sampleTimes/numProcesses))
+    sampleTimesList.append(sampleTimes - int(sum(sampleTimesList)))
+
+    argList = []
+    for i in range(len(sampleTimesList)):
+        argList.append({
+            'sampleTimes': sampleTimesList[i],
+            'T_ORIGINAL': T_ORIGINAL,
+            'validation_inputs':validation_inputs,
+            'validation_classes':validation_classes,
+            'config': config
+        })
+
+    with multiprocessing.Pool(numProcesses) as pool:
+        result = pool.map(runner, argList)
+
+    accu = sum(result) / numProcesses
+    print(f'Average inference accuracy: {accu}')
+
+def runner(args:dict) -> float:
+    sampleTimes, T_ORIGINAL, validation_inputs,validation_classes, config = (
+        args['sampleTimes'],
+        args['T_ORIGINAL'],
+        args['validation_inputs'],
+        args['validation_classes'],
+        args['config']
+    )
+
     accu = 0
     for i in range(sampleTimes):
         t = copyTree(T_ORIGINAL)
-        
         addWeightVariation(t, config)
         accu += pred(t, validation_inputs, validation_classes, printResult=False)
-    accu /= sampleTimes
-    print(f'Average inference accuracy: {accu}')
+    
+    return accu / sampleTimes
 
 def pred(
     rootNode: Union[Decision_Node, Leaf],
