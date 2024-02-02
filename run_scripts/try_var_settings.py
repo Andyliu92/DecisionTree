@@ -27,7 +27,7 @@ plotlyOutputPath = scriptFolder.joinpath("./plot.html")
 matplotlibOutputPath = scriptFolder.joinpath("./plot.png")
 
 varList = [0.01, 0.05, 0.1, 0.5, 1.0]
-sampleTimesList = [10, 50, 100]
+sampleTimesList = [100]
 
 jobList = {
     "300train100validation": {
@@ -71,76 +71,6 @@ def getAccu(outputDir: Path, accuracyResult:pd.DataFrame) -> pd.DataFrame:
     return accuracyResult
 
 
-def plotly_plot(jobList: dict):
-    traces = []
-    for jobName in jobList.keys():
-        accuracyResult = jobList[jobName]["accuResult"]
-        edpResult = jobList[jobName]["edpResult"]
-        alphaGrid, senseThresGrid = np.meshgrid(alphaList, senseThresList)
-
-        traces.append(
-            go.Surface(x=alphaGrid, y=senseThresGrid, z=accuracyResult, text=jobName)
-        )
-
-    # print(varGrid)
-    # print(sensingLimitGrid)
-    # print(accuracyResult)
-
-    fig = go.Figure(data=traces)
-    fig.update_layout(
-        scene=dict(
-            zaxis=dict(title="Accuracy"),
-            xaxis=dict(title="Alpha"),
-            yaxis=dict(title="Sensing Threshold"),
-        )
-    )
-
-    with open(plotlyOutputPath, mode="w") as fout:
-        fout.write(fig.to_html())
-    fig.show()
-
-
-def matplotlib_plot(jobList: dict):
-    import matplotlib.pyplot as plt
-
-    assert (
-        len(jobList.keys()) == 1
-    ), "this function is for drawing heatmap for 1 job, not multiple jobs."
-
-    fig, ax = plt.subplots()
-
-    for jobName in jobList.keys():
-        data = jobList[jobName]["accuResult"]
-
-    heatmap = ax.imshow(data, cmap="coolwarm", interpolation="nearest")
-
-    # Add colorbar to show the scale
-    cbar = plt.colorbar(heatmap)
-
-    # Set axis labels
-    ax.set_xticks(np.arange(len(data.columns)))
-    ax.set_yticks(np.arange(len(data.index)))
-    ax.set_xticklabels(data.columns)
-    ax.set_yticklabels(data.index)
-
-    # Rotate the tick labels and set their alignment
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-
-    # Show the values within each grid
-    for i in range(len(data.index)):
-        for j in range(len(data.columns)):
-            row = data.index[i]
-            col = data.columns[j]
-            text = f"{data.at[row, col]:.3f}"
-            ax.text(j, i, text, ha="center", va="center", color="w", fontsize=4)
-
-    # Set titles for x-axis and y-axis
-    ax.set_xlabel("Sensing Threshold")
-    ax.set_ylabel("Alpha in Logit Function")
-
-    plt.savefig(matplotlibOutputPath, dpi=250)
-
-
 def run_exp(
     accuResult: pd.DataFrame, outputDir: Path, n_train: int, n_validation: int
 ) -> pd.DataFrame:
@@ -178,10 +108,11 @@ def run_exp(
                 }
             )
 
-    num_processes = multiprocessing.cpu_count()
+    # num_processes = multiprocessing.cpu_count()
+    num_processes = 7
 
-    # with multiprocessing.Pool(num_processes) as pool:
-    #     pool.map(runner, settingsList)
+    with multiprocessing.Pool(num_processes) as pool:
+        pool.map(runner, settingsList)
 
     accuResult= getAccu(outputDir, accuResult)
 

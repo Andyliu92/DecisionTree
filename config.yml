@@ -1,4 +1,4 @@
 hasWeightVar: true
 weightVar:
-  sampleTimes: 300
+  sampleTimes: 30
   stdDev: 0.1

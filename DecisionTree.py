@@ -8,6 +8,7 @@ from typing import Union, Tuple
 from pathlib import Path
 from copy import deepcopy
 import re
+import multiprocessing
 
 scriptDir = Path(__file__)
 
@@ -70,7 +71,7 @@ class Question:
     question. See the demo below.
     """
 
-    def __init__(self, column, value:int, header):
+    def __init__(self, column, value: int, header):
         self.column = column
         self.value = value
         self.header = header
@@ -124,10 +125,10 @@ class Question:
         true_rows = rows[mask]
         false_rows = rows[~mask]
         return true_rows, false_rows
-    
-    def getValue(self)->Union[int, float]:
+
+    def getValue(self) -> Union[int, float]:
         return self.value
-    
+
     def setValue(self, value: Union[int, float]):
         self.value = value
 
@@ -217,29 +218,66 @@ def find_best_split_var(
     sampleTimes = config["weightVar"]["sampleTimes"]
     varStdDev = config["weightVar"]["stdDev"]
 
+    argumentList = []
     for col in range(n_features):  # for each feature
-        values = set([row[col] for row in rows])  # unique values in the column
+        argumentList.append(
+            {
+                "col": col,
+                "rows": rows,
+                "sampleTimes": sampleTimes,
+                "varStdDev": varStdDev,
+                "header": header,
+                "current_uncertainty": current_uncertainty,
+            }
+        )
+    
+    num_processes = multiprocessing.cpu_count()
+    # num_processes = 7
 
-        sortedValues = sorted(values)
-        midPointValues = [
-            (sortedValues[i] + sortedValues[i + 1]) / 2
-            for i in range(len(sortedValues) - 1)
-        ]
+    with multiprocessing.Pool(num_processes) as pool:
+        results = pool.map(__col_best_gain_runner, argumentList)
 
-        for val in midPointValues:  # for each value
-            gain = 0
-            for i in range(sampleTimes):
-                valWithVar = val + np.random.normal(0, varStdDev)
-                question = Question(col, valWithVar, header)
+    for colResult in results:
+        if colResult[0] >= best_gain:
+            best_gain, best_question = colResult[0], colResult[1]
+    return best_gain, best_question
 
-                gain += __calculate_gain(question, rows, current_uncertainty)
 
-            # You actually can use '>' instead of '>=' here
-            # but I wanted the tree to look a certain way for our
-            # toy dataset.
-            gain /= sampleTimes
-            if gain >= best_gain:
-                best_gain, best_question = gain, Question(col, val, header)
+def __col_best_gain_runner(config: dict) -> Tuple[float, Question]:
+    (col, rows, sampleTimes, varStdDev, header, current_uncertainty) = (
+        config["col"],
+        config["rows"],
+        config["sampleTimes"],
+        config["varStdDev"],
+        config["header"],
+        config["current_uncertainty"],
+    )
+
+    best_gain = 0  # keep track of the best information gain
+    best_question = None  # keep train of the feature / value that produced it
+
+    values = set([row[col] for row in rows])  # unique values in the column
+    sortedValues = sorted(values)
+    midPointValues = [
+        (sortedValues[i] + sortedValues[i + 1]) / 2
+        for i in range(len(sortedValues) - 1)
+    ]
+
+    for val in midPointValues:  # for each value
+        gain = 0
+        for i in range(sampleTimes):
+            valWithVar = val + np.random.normal(0, varStdDev)
+            question = Question(col, valWithVar, header)
+
+            gain += __calculate_gain(question, rows, current_uncertainty)
+
+        # You actually can use '>' instead of '>=' here
+        # but I wanted the tree to look a certain way for our
+        # toy dataset.
+        gain /= sampleTimes
+        if gain >= best_gain:
+            best_gain, best_question = gain, Question(col, val, header)
+    
     return best_gain, best_question
 
 
@@ -440,7 +478,8 @@ def exportTreeText(node: Decision_Node, outputFile, spacing=""):
     # Call this function recursively on the false branch
     exportTreeText(node.false_branch, outputFile, spacing + "|   ")
 
-def getTreeText(node: Decision_Node, initText='' , spacing="") -> str:
+
+def getTreeText(node: Decision_Node, initText="", spacing="") -> str:
     """World's most elegant tree printing function."""
 
     # Base case: we've reached a leaf
@@ -451,13 +490,11 @@ def getTreeText(node: Decision_Node, initText='' , spacing="") -> str:
         return initText
 
     # Print the question at this node
-    initText += (spacing + "|---" + str(node.question.treeTextQuestion()) + "\n")
+    initText += spacing + "|---" + str(node.question.treeTextQuestion()) + "\n"
     # Call this function recursively on the true branch
     initText = getTreeText(node.true_branch, initText, spacing + "|   ")
 
-    initText += (
-        spacing + "|---" + str(node.question.treeTextInverseQuestion()) + "\n"
-    )
+    initText += spacing + "|---" + str(node.question.treeTextInverseQuestion()) + "\n"
     # Call this function recursively on the false branch
     initText = getTreeText(node.false_branch, initText, spacing + "|   ")
 
@@ -518,7 +555,10 @@ def computeAccuracy(rows, node):
             accuracy += 1
     return round(accuracy / count, 2)
 
+
 __copyTreeNodeID = 0
+
+
 def copyTree(node: Union[Decision_Node, Leaf]) -> Union[Decision_Node, Leaf]:
     global __copyTreeNodeID
     if isinstance(node, Leaf):
@@ -527,15 +567,17 @@ def copyTree(node: Union[Decision_Node, Leaf]) -> Union[Decision_Node, Leaf]:
         __copyTreeNodeID += 1
         return result
     elif isinstance(node, Decision_Node):
-        node = deepcopy(Decision_Node(
-            node.question,
-            copyTree(node.true_branch),
-            copyTree(node.false_branch),
-            node.depth,
-            node.id,
-            node.rows,
-            f"copied, id{__copyTreeNodeID}",
-        ))
+        node = deepcopy(
+            Decision_Node(
+                node.question,
+                copyTree(node.true_branch),
+                copyTree(node.false_branch),
+                node.depth,
+                node.id,
+                node.rows,
+                f"copied, id{__copyTreeNodeID}",
+            )
+        )
         __copyTreeNodeID += 1
         return node
     else:
@@ -544,7 +586,7 @@ def copyTree(node: Union[Decision_Node, Leaf]) -> Union[Decision_Node, Leaf]:
 
 # Parse the tree structure text into a nested dictionary
 def parseTreeStructure(
-    text: str, header=[f'feature_{i}' for i in range(1024)]
+    text: str, header=[f"feature_{i}" for i in range(1024)]
 ) -> Union[Decision_Node, Leaf]:
     """
     this function takes a tree text and returns the parsed tree structure and all leaf nodes, and all feature ids, class ids, and thresholds used in the tree.
@@ -581,7 +623,7 @@ def __parseSubTree(
     featureIDs: list[int],
     classIDs: list[int],
     thresholds: list[float],
-    header: list[str]
+    header: list[str],
 ) -> Tuple[
     Union[Leaf, Decision_Node], int, list[dict], list[int], list[int], list[float]
 ]:
@@ -637,7 +679,9 @@ def __parseSubTree(
 
         question = Question(featureID, threshold, header)
 
-        stemNode = Decision_Node(question, leNode, gtNode, 0, __nodeUID, np.array([[0]]), "loaded")
+        stemNode = Decision_Node(
+            question, leNode, gtNode, 0, __nodeUID, np.array([[0]]), "loaded"
+        )
 
         return stemNode, endLineId, leafNodes, featureIDs, classIDs, thresholds
     else:
@@ -655,7 +699,7 @@ def loadTree(treeTextPath: Path) -> Union[Leaf, Decision_Node]:
     return parseTreeStructure(treeText)
 
 
-def addWeightVariation(node: Union[Decision_Node, Leaf], config:dict):
+def addWeightVariation(node: Union[Decision_Node, Leaf], config: dict):
     assert (
         config["hasWeightVar"] == True
     ), "config file indicates no variation but addWeightVariation() is called!"
