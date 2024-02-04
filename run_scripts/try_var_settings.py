@@ -26,14 +26,40 @@ if not resultDir.exists():
 plotlyOutputPath = scriptFolder.joinpath("./plot.html")
 matplotlibOutputPath = scriptFolder.joinpath("./plot.png")
 
-varList = [0.01, 0.05, 0.1, 0.5, 1.0]
+varList = [
+    0.00001,
+    0.00003,
+    0.00005,
+    0.00007,
+    0.0001,
+    0.0003,
+    0.0005,
+    0.0007,
+    0.001,
+    0.003,
+    0.005,
+    0.007,
+    0.01,
+    0.03,
+    0.05,
+    0.07,
+    0.08,
+    0.1,
+    0.11,
+    0.12,
+    0.15,
+    0.20,
+    0.30,
+    0.5,
+    1.0
+]
 sampleTimesList = [100]
 
 jobList = {
     "300train100validation": {
         "n_train": 300,
         "n_validation": 100,
-        'hasWeightVar': True,
+        "hasWeightVar": True,
         "outputDir": simOutputBaseDir.joinpath("300train100validation"),
     },
     # "30train10validation": {
@@ -45,12 +71,12 @@ jobList = {
 }
 
 
-def getAccu(outputDir: Path, accuracyResult:pd.DataFrame) -> pd.DataFrame:
+def getAccu(outputDir: Path, accuracyResult: pd.DataFrame) -> pd.DataFrame:
     """
     return: accuracy, EDP
     """
     # print(accuracyResult)
-    logList = list(outputDir.glob('*.log'))
+    logList = list(outputDir.glob("*.log"))
     for logPath in logList:
         accuracy = None
         with open(logPath, mode="r") as f:
@@ -61,9 +87,9 @@ def getAccu(outputDir: Path, accuracyResult:pd.DataFrame) -> pd.DataFrame:
         assert accuracy != None, "accuracy or edp not extracted!"
 
         fileStem = logPath.stem
-        stemTokens = fileStem.strip().split('_')
-        stdDev = float(re.match('[0-9]+.[0-9]+', stemTokens[0]).group())
-        sampleTimes = int(re.match('[0-9]+', stemTokens[1]).group())
+        stemTokens = fileStem.strip().split("_")
+        stdDev = float(re.match("[0-9]+.[0-9]+", stemTokens[0]).group())
+        sampleTimes = int(re.match("[0-9]+", stemTokens[1]).group())
         # print(f'stdDev: {stdDev}, sampleTimes: {sampleTimes}')
 
         accuracyResult.at[stdDev, sampleTimes] = accuracy
@@ -87,16 +113,16 @@ def run_exp(
             config["weightVar"]["sampleTimes"] = sampleTimes
 
             destConfigPath = configDir.joinpath(
-                f"{stdDev}stdDev_{sampleTimes}sampleTimes.yml"
+                "%fstdDev_%dsampleTimes.yml" % (stdDev, sampleTimes)
             )
             with open(destConfigPath, "w") as yaml_file:
                 yaml.dump(config, yaml_file, default_flow_style=False)
 
             runOutputPath = outputDir.joinpath(
-                f"{stdDev}stdDev_{sampleTimes}sampleTimes_runOutput.log"
+                "%fstdDev_%dsampleTimes_runOutput.log" % (stdDev, sampleTimes)
             )
             treeTextOutputPath = outputDir.joinpath(
-                f"{stdDev}stdDev_{sampleTimes}sampleTimes_treeText.txt"
+                "%fstdDev_%dsampleTimes_treeText.txt" % (stdDev, sampleTimes)
             )
             settingsList.append(
                 {
@@ -117,7 +143,7 @@ def run_exp(
     # for settings in settingsList:
     #     runner(settings)
 
-    accuResult= getAccu(outputDir, accuResult)
+    accuResult = getAccu(outputDir, accuResult)
 
     return accuResult
 
@@ -139,7 +165,6 @@ def runner(config: dict):
         == 0
     ), "run script failed."
     print(f"finished running with config {configPath}")
-
 
 
 def main():
@@ -170,7 +195,9 @@ def main():
 
     # plotly_plot(jobList)
     # matplotlib_plot(jobList)
-    os.system(f'/home/andyliu/miniconda3/envs/hd-mann/bin/python {emailScriptPath} -m "Finished script: try_var_settings"')
+    os.system(
+        f'/home/andyliu/miniconda3/envs/hd-mann/bin/python {emailScriptPath} -m "Finished script: try_var_settings"'
+    )
 
 
 def plot_jobs():
