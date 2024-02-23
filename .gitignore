@@ -3,3 +3,5 @@
 test.py
 *.txt
 *.pyc
+*._.DS_Store
+*.DS_Store

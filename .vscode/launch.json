@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}",
-            "args": ["--tree_text", "/home/andyliu/Coding/evacamx/example/DecisionTree/training/outputs/300train100validation/0.1stdDev_100sampleTimes_treeText.txt"]
+            // "args": ["--tree_text", "/home/andyliu/Coding/evacamx/example/DecisionTree/training/outputs/300train100validation/0.1stdDev_100sampleTimes_treeText.txt"]
         },
         {
             "name": "Python: Main",

@@ -4,6 +4,7 @@
         "reportUnboundVariable": "warning",
         "reportOptionalMemberAccess": "warning",
         "reportOptionalSubscript": "warning",
-        "reportOptionalIterable": "warning"
+        "reportOptionalIterable": "warning",
+        "reportAttributeAccessIssue": "warning"
     }
 }

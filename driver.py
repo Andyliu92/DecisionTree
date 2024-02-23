@@ -8,11 +8,12 @@ from sklearn import model_selection
 import yaml
 from pathlib import Path
 import dataset.BelgiumTSC.BTSC_adapted as btsc_adapted
+import dataset.iris as iris
 import numpy as np
 import argparse
 
 scriptDir = Path(__file__).parent
-outputDie = scriptDir.joinpath('outputs')
+outputDie = scriptDir.joinpath("outputs")
 
 parser = argparse.ArgumentParser(description="")
 
@@ -20,16 +21,19 @@ parser.add_argument(
     "--n_train", type=int, default=300, help="Use n_train samples for training"
 )
 parser.add_argument(
-    "--n_validation", type=int, default=100, help="Use n_validation samples for validation"
+    "--n_validation",
+    type=int,
+    default=100,
+    help="Use n_validation samples for validation",
 )
 parser.add_argument(
     "--n_test", type=int, default=-1, help="Use n_test samples for testing"
 )
 parser.add_argument(
-    '--output_path', type=str, default='treeText.txt', help='Tree text output path'
+    "--output_path", type=str, default="treeText.txt", help="Tree text output path"
 )
 parser.add_argument(
-    '--config', type=str, default='config.yml', help='The config file path'
+    "--config", type=str, default="config.yml", help="The config file path"
 )
 
 args = parser.parse_args()
@@ -62,23 +66,27 @@ with open(configPath, "r") as f:
 # splitting the data set into train and test
 # trainDF, testDF = model_selection.train_test_split(lst, test_size=0.2)
 
-dataset = btsc_adapted.load_rand_data(N_TRAIN, N_VALIDATION, N_TEST)
-(
-    train_inputs,
-    train_classes,
-    validation_inputs,
-    validation_classes,
-    test_inputs,
-    test_classes,
-) = (
-    dataset["train_inputs"],
-    dataset["train_classes"],
-    dataset["validation_inputs"],
-    dataset["validation_classes"],
-    dataset["test_inputs"],
-    dataset["test_classes"],
-)
+# dataset = btsc_adapted.load_rand_data(N_TRAIN, N_VALIDATION, N_TEST)
+# (
+#     train_inputs,
+#     train_classes,
+#     validation_inputs,
+#     validation_classes,
+#     test_inputs,
+#     test_classes,
+# ) = (
+#     dataset["train_inputs"],
+#     dataset["train_classes"],
+#     dataset["validation_inputs"],
+#     dataset["validation_classes"],
+#     dataset["test_inputs"],
+#     dataset["test_classes"],
+# )
 
+(train_inputs, validation_inputs, train_classes, validation_classes) = (
+    iris.load_data_2feature()
+)
+(test_inputs, test_classes) = (None, None)
 
 # Reshape labels_array to have the same number of dimensions as data_array
 train_classes_reshaped = train_classes[:, np.newaxis]
