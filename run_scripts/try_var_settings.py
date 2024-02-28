@@ -56,6 +56,8 @@ varList = [
 ]
 sampleTimesList = [100]
 
+scalingFactor = 2
+
 jobList = {
     "300train100validation": {
         "n_train": 300,
@@ -110,7 +112,7 @@ def run_exp(
             with open(templateConfigPath, mode="r") as fin:
                 config = yaml.load(fin, Loader=yaml.FullLoader)
 
-            config["weightVar"]["stdDev"] = stdDev
+            config["weightVar"]["stdDev"] = stdDev * scalingFactor
             config["weightVar"]["sampleTimes"] = sampleTimes
 
             destConfigPath = configDir.joinpath(
