@@ -27,6 +27,7 @@ plotlyOutputPath = scriptFolder.joinpath("./plot.html")
 matplotlibOutputPath = scriptFolder.joinpath("./plot.png")
 
 varList = [
+    0,
     0.00001,
     0.00003,
     0.00005,
@@ -179,7 +180,7 @@ def main():
         )
 
         if not jobList[jobName]["outputDir"].exists():
-            jobList[jobName]["outputDir"].mkdir()
+            jobList[jobName]["outputDir"].mkdir(parents=True)
 
         jobList[jobName]["accuResult"] = run_exp(
             jobList[jobName]["accuResult"],
@@ -216,7 +217,6 @@ def plot_jobs():
         ]
 
     # plotly_plot(jobList)
-    matplotlib_plot(jobList)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ from sklearn import model_selection
 import yaml
 from pathlib import Path
 import dataset.BelgiumTSC.BTSC_adapted as btsc_adapted
+import dataset.iris.iris as iris
 import numpy as np
 from sklearn.metrics import accuracy_score
 import argparse
@@ -53,14 +54,22 @@ with open(configPath, "r") as f:
 
 
 def main():
-    dataset = btsc_adapted.load_rand_data(N_TRAIN, N_VALIDATION, N_TEST)
+    # dataset = btsc_adapted.load_rand_data(N_TRAIN, N_VALIDATION, N_TEST)
+    # (
+    #     validation_inputs,
+    #     validation_classes,
+    # ) = (
+    #     dataset["validation_inputs"],
+    #     dataset["validation_classes"],
+    # )
     (
+        train_inputs,
+        train_classes,
         validation_inputs,
         validation_classes,
-    ) = (
-        dataset["validation_inputs"],
-        dataset["validation_classes"],
-    )
+        test_inputs,
+        test_classes,
+    ) = iris.load_data_2feature()
 
     T_ORIGINAL = loadTree(treeTextPath)
     pred(T_ORIGINAL, validation_inputs, validation_classes)

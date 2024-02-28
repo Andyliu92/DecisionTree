@@ -5,6 +5,8 @@
         "reportOptionalMemberAccess": "warning",
         "reportOptionalSubscript": "warning",
         "reportOptionalIterable": "warning",
-        "reportAttributeAccessIssue": "warning"
+        "reportAttributeAccessIssue": "warning",
+        "reportCallIssue": "warning",
+        "reportArgumentType": "warning" 
     }
 }

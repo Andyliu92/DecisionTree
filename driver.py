@@ -8,7 +8,7 @@ from sklearn import model_selection
 import yaml
 from pathlib import Path
 import dataset.BelgiumTSC.BTSC_adapted as btsc_adapted
-import dataset.iris as iris
+import dataset.iris.iris as iris
 import numpy as np
 import argparse
 
@@ -67,26 +67,14 @@ with open(configPath, "r") as f:
 # trainDF, testDF = model_selection.train_test_split(lst, test_size=0.2)
 
 # dataset = btsc_adapted.load_rand_data(N_TRAIN, N_VALIDATION, N_TEST)
-# (
-#     train_inputs,
-#     train_classes,
-#     validation_inputs,
-#     validation_classes,
-#     test_inputs,
-#     test_classes,
-# ) = (
-#     dataset["train_inputs"],
-#     dataset["train_classes"],
-#     dataset["validation_inputs"],
-#     dataset["validation_classes"],
-#     dataset["test_inputs"],
-#     dataset["test_classes"],
-# )
-
-(train_inputs, validation_inputs, train_classes, validation_classes) = (
-    iris.load_data_2feature()
-)
-(test_inputs, test_classes) = (None, None)
+(
+    train_inputs,
+    train_classes,
+    validation_inputs,
+    validation_classes,
+    test_inputs,
+    test_classes,
+) = iris.load_data_2feature()
 
 # Reshape labels_array to have the same number of dimensions as data_array
 train_classes_reshaped = train_classes[:, np.newaxis]
