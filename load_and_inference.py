@@ -54,22 +54,22 @@ with open(configPath, "r") as f:
 
 
 def main():
-    # dataset = btsc_adapted.load_rand_data(N_TRAIN, N_VALIDATION, N_TEST)
-    # (
-    #     validation_inputs,
-    #     validation_classes,
-    # ) = (
-    #     dataset["validation_inputs"],
-    #     dataset["validation_classes"],
-    # )
+    dataset = btsc_adapted.load_rand_data(N_TRAIN, N_VALIDATION, N_TEST)
     (
-        train_inputs,
-        train_classes,
         validation_inputs,
         validation_classes,
-        test_inputs,
-        test_classes,
-    ) = iris.load_data_2feature()
+    ) = (
+        dataset["validation_inputs"],
+        dataset["validation_classes"],
+    )
+    # (
+    #     train_inputs,
+    #     train_classes,
+    #     validation_inputs,
+    #     validation_classes,
+    #     test_inputs,
+    #     test_classes,
+    # ) = iris.load_data_2feature()
 
     T_ORIGINAL = loadTree(treeTextPath)
     pred(T_ORIGINAL, validation_inputs, validation_classes)
